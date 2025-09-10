@@ -29,10 +29,10 @@
           ];
 
           shellHook = ''
-            echo "🚀 Entering polyglot monorepo environment with Bazel + Nix"
-            echo "📦 Available tools: bazel, uv, node, cargo, go, protoc, aws"
-            echo "🏗️  Run 'bazel build //...' to build all targets"
-            echo "🧪 Run 'bazel test //...' to run all tests"
+            echo "Entering polyglot monorepo environment with Bazel + Nix"
+            echo "Available tools: bazel, uv, node, cargo, go, protoc, aws"
+            echo "Run 'bazel build //...' to build all targets"
+            echo "Run 'bazel test //...' to run all tests"
           '';
         };
       }

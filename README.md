@@ -44,6 +44,30 @@ bazel build //...
 bazel test //...
 ```
 
+### Activate flake.nix
+Use the Nix flake dev shell to get all required tools (Bazel, Python, Node, Rust, Go, etc.) on your PATH before running commands:
+
+```bash
+# Interactive shell (from repo root)
+nix develop
+
+# Explicitly target the default dev shell
+nix develop .#default
+
+# One-shot: run a command inside the dev shell without entering it
+nix develop -c bazel build //...
+nix develop -c bazel test //...
+```
+
+Optional: auto-activate the dev shell when you cd into the repo using direnv + nix-direnv:
+
+```bash
+# Install direnv and nix-direnv (one-time, via your OS/Nix)
+# Then in the repo root:
+echo 'use flake' > .envrc
+direnv allow
+```
+
 ## Repository Structure
 
 ```
