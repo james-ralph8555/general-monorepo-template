@@ -64,4 +64,3 @@ uv run pytest           # run tests within the environment
 - One project → one `pyproject.toml` → one local `.venv/` (ignored).
 - Use `uv sync` and `uv run` for a smooth developer workflow.
 - Commit `uv.lock` for applications; optional for libraries.
-

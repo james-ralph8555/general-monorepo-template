@@ -1,144 +1,328 @@
 # Language Implementation Examples
 
-This document provides working examples of how to add different technologies to the monorepo. These examples demonstrate the integration patterns and can be used as templates for new implementations.
+This document provides comprehensive working examples of how to integrate different technologies into the monorepo. These examples complement the detailed guides in `docs/agents/` and serve as practical templates for implementation.
 
 ## Overview
 
-Each example follows the same integration pattern:
-1. **Bazel Rules**: Add appropriate `rules_*` to MODULE.bazel
-2. **System Dependencies**: Ensure tools are available in flake.nix (usually already included)
-3. **Language Dependencies**: Use native package managers (uv, npm, cargo)
-4. **Build Configuration**: Create BUILD.bazel files with proper targets
-5. **Testing**: Include test targets and validation
+This monorepo supports multiple programming languages and technology stacks through a unified Bazel + Nix architecture. Each technology integration follows consistent patterns:
+
+1. **Hermetic System Dependencies**: Core tools (compilers, runtimes) provided by Nix
+2. **Language-Specific Package Management**: Native package managers for dependencies
+3. **Bazel Build Integration**: Unified build system with cross-language dependencies
+4. **Testing and Validation**: Comprehensive test coverage with CI integration
+5. **Deployment Ready**: Container images and deployment configurations
 
 ## Prerequisites
 
-Before implementing any of these examples:
+Ensure you're properly set up:
 ```bash
-# Ensure you're in the development environment
+# Enter the development environment
 nix develop
 
-# Verify Bazel is working
-bazel version
+# Verify tools are available
+bazel version        # Build system
+python --version     # Python 3.11+
+node --version       # Node.js 18+
+rustc --version      # Rust 1.70+
+go version          # Go 1.21+
+java --version      # Java 17+
 ```
 
-## Python Backend with uv
+For detailed setup instructions, see the technology-specific guides in `docs/agents/`.
 
-### uv environment notes
-- Prefer a project-local `.venv/` (git-ignored) created via `uv venv` or `uv sync`.
-- Drive execution with `uv run <cmd>` to avoid manual activation.
-- Commit `uv.lock` for applications; optional for libraries.
-- This repo’s `.gitignore` ignores `.venv/` to keep virtualenvs out of version control.
+## Python Development Examples
 
-### Directory Structure
+### FastAPI Web Service
+
+**Directory Structure:**
 ```
-apps/backend/
+apps/python-api/
 ├── BUILD.bazel
-├── main.py
 ├── pyproject.toml
-└── uv.lock
+├── uv.lock
+├── src/
+│   ├── main.py
+│   ├── api/
+│   │   └── users.py
+│   └── models/
+│       └── user.py
+└── tests/
+    └── test_api.py
 ```
 
-### MODULE.bazel Addition
+**Key Files:**
+
+MODULE.bazel addition:
 ```python
 bazel_dep(name = "rules_python", version = "0.31.0")
+
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(
+    hub_name = "pypi",
+    python_version = "3.11",
+    requirements_lock = "//:requirements_lock.txt",
+)
+use_repo(pip, "pypi")
 ```
 
-### BUILD.bazel
+BUILD.bazel:
 ```python
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+
+py_library(
+    name = "api_lib",
+    srcs = glob(["src/**/*.py"]),
+    deps = [
+        "@pypi//fastapi",
+        "@pypi//uvicorn",
+        "@pypi//pydantic",
+    ],
+    visibility = ["//visibility:public"],
+)
 
 py_binary(
     name = "server",
-    srcs = ["main.py"],
-    main = "main.py",
+    srcs = ["src/main.py"],
+    main = "src/main.py",
+    deps = [":api_lib"],
+)
+
+py_test(
+    name = "test",
+    srcs = glob(["tests/**/*.py"]),
     deps = [
-        # uv-managed dependencies would be imported here
+        ":api_lib",
+        "@pypi//pytest",
+        "@pypi//httpx",
     ],
 )
 ```
 
-### pyproject.toml
+pyproject.toml:
 ```toml
 [project]
-name = "backend"
+name = "python-api"
 version = "0.1.0"
 dependencies = [
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.20.0",
+    "pydantic>=2.0.0",
 ]
 
 [tool.uv]
 dev-dependencies = [
     "pytest>=7.0.0",
+    "httpx>=0.24.0",
 ]
-
-# Lockfile guidance
-# For applications, generate and commit a lockfile:
-#   uv lock
-# Local env management (no activation needed):
-#   uv sync
-#   uv run python -m backend
 ```
 
-## React Frontend
+**Commands:**
+```bash
+# Setup dependencies
+uv sync
 
-### Directory Structure
+# Development server
+bazel run //apps/python-api:server
+
+# Run tests
+bazel test //apps/python-api:test
 ```
-apps/frontend/
+
+### Data Processing Pipeline
+
+**Directory Structure:**
+```
+packages/data-utils/
+├── BUILD.bazel
+├── pyproject.toml
+├── src/
+│   ├── processors/
+│   │   ├── csv_processor.py
+│   │   └── json_processor.py
+│   └── utils/
+│       └── validation.py
+└── tests/
+    └── test_processors.py
+```
+
+BUILD.bazel:
+```python
+py_library(
+    name = "data_utils",
+    srcs = glob(["src/**/*.py"]),
+    deps = [
+        "@pypi//pandas",
+        "@pypi//numpy",
+        "@pypi//pydantic",
+    ],
+    visibility = ["//visibility:public"],
+)
+```
+
+## JavaScript/TypeScript Examples
+
+### React Single Page Application
+
+**Directory Structure:**
+```
+apps/react-app/
 ├── BUILD.bazel
 ├── package.json
+├── tsconfig.json
+├── webpack.config.js
 ├── src/
-│   ├── index.js
-│   └── index.html
-└── webpack.config.js
+│   ├── index.tsx
+│   ├── App.tsx
+│   ├── components/
+│   │   ├── Header.tsx
+│   │   └── UserList.tsx
+│   └── __tests__/
+│       └── App.test.tsx
+└── public/
+    └── index.html
 ```
 
-### MODULE.bazel Addition
+**Key Files:**
+
+MODULE.bazel addition:
 ```python
-bazel_dep(name = "rules_js", version = "1.40.0")
-bazel_dep(name = "rules_nodejs", version = "6.0.0")
+bazel_dep(name = "aspect_rules_js", version = "1.40.0")
+bazel_dep(name = "aspect_rules_ts", version = "2.2.0")
+bazel_dep(name = "aspect_rules_webpack", version = "0.14.0")
+
+npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
+npm.npm_translate_lock(
+    name = "npm",
+    pnpm_lock = "//:pnpm-lock.yaml",
+)
+use_repo(npm, "npm")
 ```
 
-### BUILD.bazel
+BUILD.bazel:
 ```python
-load("@rules_js//js:defs.bzl", "js_library", "js_binary")
+load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_test")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_config", "ts_project")
+load("@aspect_rules_webpack//webpack:defs.bzl", "webpack_bundle")
 
-js_library(
-    name = "app",
-    srcs = glob(["src/**/*.js", "src/**/*.jsx"]),
+ts_config(
+    name = "tsconfig",
+    src = "tsconfig.json",
+)
+
+ts_project(
+    name = "src",
+    srcs = glob(["src/**/*.ts", "src/**/*.tsx"]),
+    declaration = True,
+    tsconfig = ":tsconfig",
     deps = [
         "@npm//react",
         "@npm//react-dom",
+        "@npm//@types/react",
+        "@npm//@types/react-dom",
+    ],
+)
+
+webpack_bundle(
+    name = "bundle",
+    entry_point = "src/index.tsx",
+    config = "webpack.config.js",
+    deps = [":src"],
+    data = glob(["public/**/*"]),
+)
+
+js_test(
+    name = "test",
+    data = [
+        ":src",
+        "@npm//jest",
+        "@npm//@testing-library/react",
+    ],
+    entry_point = "jest.config.js",
+)
+```
+
+### Node.js Express API
+
+**Directory Structure:**
+```
+apps/node-api/
+├── BUILD.bazel
+├── package.json
+├── tsconfig.json
+├── src/
+│   ├── server.ts
+│   ├── routes/
+│   │   └── users.ts
+│   └── middleware/
+│       └── auth.ts
+└── tests/
+    └── server.test.ts
+```
+
+BUILD.bazel:
+```python
+ts_project(
+    name = "api_lib",
+    srcs = glob(["src/**/*.ts"]),
+    tsconfig = ":tsconfig",
+    deps = [
+        "@npm//express",
+        "@npm//@types/express",
+        "@npm//cors",
     ],
 )
 
 js_binary(
-    name = "dev_server",
-    data = [":app"],
-    entry_point = "src/index.js",
+    name = "server",
+    data = [":api_lib"],
+    entry_point = "src/server.js",
+    env = {"NODE_ENV": "production"},
 )
 ```
 
-## Rust CLI Tool
+## Rust Examples
 
-### Directory Structure
+### CLI Tool with Clap
+
+**Directory Structure:**
 ```
 tools/rust-cli/
 ├── BUILD.bazel
 ├── Cargo.toml
-└── src/
-    └── main.rs
+├── src/
+│   ├── main.rs
+│   ├── commands/
+│   │   ├── mod.rs
+│   │   ├── build.rs
+│   │   └── deploy.rs
+│   └── config/
+│       └── mod.rs
+└── tests/
+    └── integration_test.rs
 ```
 
-### MODULE.bazel Addition
+**Key Files:**
+
+MODULE.bazel addition:
 ```python
 bazel_dep(name = "rules_rust", version = "0.48.0")
+
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(edition = "2021", versions = ["1.70.0"])
+use_repo(rust, "rust_toolchains")
+
+crate = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
+crate.from_cargo(
+    name = "crates",
+    cargo_lockfile = "//:Cargo.lock",
+    manifests = ["//:Cargo.toml"],
+)
+use_repo(crate, "crates")
 ```
 
-### BUILD.bazel
+BUILD.bazel:
 ```python
-load("@rules_rust//rust:defs.bzl", "rust_binary")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
 
 rust_binary(
     name = "cli",
@@ -146,57 +330,226 @@ rust_binary(
     edition = "2021",
     deps = [
         "@crates//:clap",
+        "@crates//:anyhow",
         "@crates//:serde",
+        "@crates//:tokio",
+    ],
+)
+
+rust_test(
+    name = "integration_test",
+    srcs = ["tests/integration_test.rs"],
+    deps = [
+        ":cli",
+        "@crates//:assert_cmd",
+        "@crates//:tempfile",
     ],
 )
 ```
 
-## gRPC API Contracts
+### Async Web Service
 
-### Directory Structure
+**Directory Structure:**
 ```
-packages/api-contracts/
+apps/rust-service/
 ├── BUILD.bazel
-└── proto/
-    └── user.proto
+├── Cargo.toml
+├── src/
+│   ├── main.rs
+│   ├── handlers/
+│   │   └── users.rs
+│   └── models/
+│       └── user.rs
+└── config/
+    └── service.toml
 ```
 
-### MODULE.bazel Addition
+BUILD.bazel:
 ```python
-bazel_dep(name = "rules_proto", version = "5.3.0-21.7")
-bazel_dep(name = "rules_proto_grpc", version = "4.5.0")
-```
-
-### BUILD.bazel
-```python
-load("@rules_proto//proto:defs.bzl", "proto_library")
-load("@rules_proto_grpc_python//:defs.bzl", "python_grpc_library")
-
-proto_library(
-    name = "user_proto",
-    srcs = ["proto/user.proto"],
-    visibility = ["//visibility:public"],
-)
-
-python_grpc_library(
-    name = "user_py_grpc",
-    protos = [":user_proto"],
-    visibility = ["//visibility:public"],
+rust_binary(
+    name = "service",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2021",
+    deps = [
+        "@crates//:axum",
+        "@crates//:tokio",
+        "@crates//:serde",
+        "@crates//:tracing",
+    ],
 )
 ```
 
-## AWS CDK Infrastructure
+## Go Examples
 
-### Directory Structure
+### HTTP Service with Gin
+
+**Directory Structure:**
 ```
-infra/cdk-app/
+apps/go-service/
+├── BUILD.bazel
+├── go.mod
+├── main.go
+├── internal/
+│   ├── handlers/
+│   │   └── users.go
+│   └── config/
+│       └── config.go
+└── pkg/
+    └── models/
+        └── user.go
+```
+
+**Key Files:**
+
+MODULE.bazel addition:
+```python
+bazel_dep(name = "rules_go", version = "0.46.0")
+bazel_dep(name = "gazelle", version = "0.36.0")
+
+go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
+go_deps.from_file(go_mod = "//:go.mod")
+use_repo(go_deps, "com_github_gin_gonic_gin")
+```
+
+BUILD.bazel:
+```python
+load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+go_library(
+    name = "service_lib",
+    srcs = glob(["**/*.go"], exclude = ["main.go", "*_test.go"]),
+    importpath = "github.com/yourorg/monorepo/apps/go-service",
+    deps = [
+        "@com_github_gin_gonic_gin//:gin",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_binary(
+    name = "service",
+    embed = [":service_lib"],
+    src = "main.go",
+)
+
+go_test(
+    name = "service_test",
+    srcs = glob(["**/*_test.go"]),
+    embed = [":service_lib"],
+)
+```
+
+### CLI Tool with Cobra
+
+**Directory Structure:**
+```
+tools/go-cli/
+├── BUILD.bazel
+├── go.mod
+├── main.go
+└── cmd/
+    ├── root.go
+    └── build.go
+```
+
+BUILD.bazel:
+```python
+go_binary(
+    name = "cli",
+    srcs = glob(["**/*.go"]),
+    deps = [
+        "@com_github_spf13_cobra//:cobra",
+        "@com_github_spf13_viper//:viper",
+    ],
+)
+```
+
+## Java Examples
+
+### Spring Boot Application
+
+**Directory Structure:**
+```
+apps/java-service/
+├── BUILD.bazel
+├── pom.xml
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── com/yourorg/service/
+│   │   │       ├── ServiceApplication.java
+│   │   │       └── controller/
+│   │   │           └── UserController.java
+│   │   └── resources/
+│   │       └── application.yml
+│   └── test/
+│       └── java/
+│           └── com/yourorg/service/
+```
+
+**Key Files:**
+
+MODULE.bazel addition:
+```python
+bazel_dep(name = "rules_java", version = "7.5.0")
+bazel_dep(name = "rules_jvm_external", version = "6.0")
+
+maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
+maven.install(
+    artifacts = [
+        "org.springframework.boot:spring-boot-starter-web:3.2.0",
+        "org.springframework.boot:spring-boot-starter-test:3.2.0",
+    ],
+    repositories = ["https://repo1.maven.org/maven2"],
+)
+use_repo(maven, "maven")
+```
+
+BUILD.bazel:
+```python
+load("@rules_java//java:defs.bzl", "java_binary", "java_library", "java_test")
+
+java_library(
+    name = "service_lib",
+    srcs = glob(["src/main/java/**/*.java"]),
+    resources = glob(["src/main/resources/**/*"]),
+    deps = [
+        "@maven//:org_springframework_boot_spring_boot_starter_web",
+    ],
+)
+
+java_binary(
+    name = "service",
+    main_class = "com.yourorg.service.ServiceApplication",
+    runtime_deps = [":service_lib"],
+)
+
+java_test(
+    name = "service_test",
+    srcs = glob(["src/test/java/**/*.java"]),
+    deps = [
+        ":service_lib",
+        "@maven//:org_springframework_boot_spring_boot_starter_test",
+    ],
+)
+```
+
+## Infrastructure Examples
+
+### AWS CDK Stack
+
+**Directory Structure:**
+```
+infra/aws-cdk/
 ├── BUILD.bazel
 ├── app.py
 ├── cdk.json
-└── requirements.txt
+├── requirements.txt
+└── stacks/
+    ├── network_stack.py
+    └── compute_stack.py
 ```
 
-### BUILD.bazel
+BUILD.bazel:
 ```python
 load("@rules_python//python:defs.bzl", "py_binary")
 
@@ -206,88 +559,345 @@ py_binary(
     main = "app.py",
     args = ["synth"],
     deps = [
-        # CDK dependencies
+        "@pypi//aws-cdk-lib",
+        "@pypi//constructs",
     ],
-    data = ["//apps/backend:server"],  # Dependency on backend
 )
 
 py_binary(
     name = "deploy",
     srcs = ["app.py"],
-    main = "app.py",
+    main = "app.py", 
     args = ["deploy"],
     deps = [
-        # CDK dependencies
+        "@pypi//aws-cdk-lib",
+        "@pypi//constructs",
+    ],
+)
+```
+
+### Kubernetes Manifests
+
+**Directory Structure:**
+```
+infra/k8s/
+├── BUILD.bazel
+├── base/
+│   ├── kustomization.yaml
+│   ├── deployment.yaml
+│   └── service.yaml
+└── overlays/
+    ├── dev/
+    └── prod/
+```
+
+BUILD.bazel:
+```python
+load("@io_bazel_rules_k8s//k8s:objects.bzl", "k8s_objects")
+
+k8s_objects(
+    name = "k8s_dev",
+    objects = [
+        "//infra/k8s/base:deployment",
+        "//infra/k8s/base:service", 
+    ],
+)
+```
+
+## Container Images
+
+### OCI Images with Bazel
+
+MODULE.bazel addition:
+```python
+bazel_dep(name = "rules_oci", version = "1.5.0")
+
+oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
+oci.pull(
+    name = "distroless_python",
+    image = "gcr.io/distroless/python3",
+    platforms = ["linux/amd64"],
+)
+use_repo(oci, "distroless_python")
+```
+
+BUILD.bazel patterns:
+```python
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_push")
+
+oci_image(
+    name = "app_image",
+    base = "@distroless_python",
+    entrypoint = ["/usr/bin/python3"],
+    cmd = ["/app/main.py"],
+    tars = ["//apps/python-api:app_tar"],
+    env = {"PORT": "8080"},
+)
+
+oci_push(
+    name = "push",
+    image = ":app_image",
+    repository = "gcr.io/my-project/app",
+)
+```
+
+## Cross-Language Integration
+
+### gRPC API Contracts
+
+**Directory Structure:**
+```
+packages/api-contracts/
+├── BUILD.bazel
+├── proto/
+│   ├── user.proto
+│   └── service.proto
+└── generated/
+    ├── python/
+    ├── typescript/
+    └── rust/
+```
+
+**Key Files:**
+
+MODULE.bazel addition:
+```python
+bazel_dep(name = "rules_proto", version = "5.3.0-21.7")
+bazel_dep(name = "rules_proto_grpc", version = "4.5.0")
+```
+
+BUILD.bazel:
+```python
+load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@rules_proto_grpc//python:defs.bzl", "python_grpc_library")
+load("@rules_proto_grpc//js:defs.bzl", "js_grpc_web_library")
+
+proto_library(
+    name = "api_proto",
+    srcs = glob(["proto/*.proto"]),
+    visibility = ["//visibility:public"],
+)
+
+# Python bindings
+python_grpc_library(
+    name = "api_py_grpc",
+    protos = [":api_proto"],
+    visibility = ["//visibility:public"],
+)
+
+# TypeScript bindings
+js_grpc_web_library(
+    name = "api_ts_grpc",
+    protos = [":api_proto"],
+    visibility = ["//visibility:public"],
+)
+```
+
+### Shared Library Dependencies
+
+**Cross-language utilities:**
+```python
+# Python utility used by multiple services
+py_library(
+    name = "shared_utils",
+    srcs = ["utils.py"],
+    visibility = ["//visibility:public"],
+    deps = ["//packages/api-contracts:api_py_grpc"],
+)
+
+# TypeScript service consuming Python-generated proto
+ts_project(
+    name = "frontend_lib",
+    deps = [
+        "//packages/api-contracts:api_ts_grpc",
+        "@npm//grpc-web",
     ],
 )
 ```
 
 ## Key Integration Patterns
 
-1. **Hermetic Dependencies**: All system-level dependencies come from Nix (compilers, tools)
-2. **Language Dependencies**: Package managers (uv, npm, cargo) handle language-specific deps
-3. **Cross-Language**: Proto definitions generate code for multiple languages
-4. **Infrastructure**: Infrastructure depends on application code for deployment validation
-5. **Testing**: All projects include test targets that run in CI
+This monorepo demonstrates several important integration patterns:
+
+### 1. Hermetic System Dependencies
+- All compilers, runtimes, and system tools provided by Nix
+- Consistent development environment across machines
+- No "works on my machine" issues
+
+### 2. Language-Specific Package Management
+- Python: `uv` for fast dependency resolution and virtual environments
+- JavaScript/TypeScript: `npm/pnpm` for package management
+- Rust: `cargo` for crate dependencies
+- Go: `go mod` for module management  
+- Java: `maven` for JAR dependencies
+
+### 3. Unified Build System
+- Single `bazel build //...` command builds entire monorepo
+- Incremental builds and intelligent caching
+- Cross-language dependency tracking
+- Parallel execution for fast builds
+
+### 4. Cross-Language Code Generation
+- Protocol Buffers generate type-safe clients in all languages
+- Shared API contracts ensure consistency
+- OpenAPI specifications for REST APIs
+
+### 5. Infrastructure as Code
+- CDK stacks written in Python
+- Kubernetes manifests managed with Kustomize
+- Container images built with Bazel rules
+- Deployment dependencies on application code
+
+### 6. Testing Strategy
+- Unit tests in each language's native framework
+- Integration tests that span multiple services
+- Contract testing for API boundaries
+- Infrastructure testing with realistic environments
 
 ## Implementation Checklist
 
-When implementing any of these examples, ensure you:
+When implementing any of these examples, follow this systematic approach:
 
-### Required Files
+### Planning Phase
+- [ ] Review the appropriate guide in `docs/agents/` for detailed patterns
+- [ ] Identify cross-language dependencies (shared libraries, proto contracts)
+- [ ] Plan directory structure following monorepo conventions
+- [ ] Choose appropriate testing strategy
+
+### Setup Phase
 - [ ] Add necessary `bazel_dep()` entries to MODULE.bazel
-- [ ] Create BUILD.bazel file with appropriate targets
-- [ ] Include test targets in BUILD.bazel
-- [ ] Add language-specific configuration files (pyproject.toml, package.json, etc.)
+- [ ] Create language-specific configuration files:
+  - Python: `pyproject.toml` with uv configuration
+  - JavaScript/TypeScript: `package.json` and `tsconfig.json`
+  - Rust: `Cargo.toml` and workspace configuration
+  - Go: `go.mod` with module path
+  - Java: `pom.xml` for Maven dependencies
+- [ ] Set up package manager lockfiles (`uv.lock`, `pnpm-lock.yaml`, etc.)
 
-### Validation Steps
+### Implementation Phase
+- [ ] Create BUILD.bazel file with appropriate targets:
+  - Library targets for reusable code
+  - Binary targets for executables
+  - Test targets for all code
+  - Data dependencies for configuration files
+- [ ] Implement core functionality following language best practices
+- [ ] Add comprehensive error handling and logging
+- [ ] Include configuration management
+
+### Validation Phase
 ```bash
-# 1. Verify the target builds
-bazel build //path/to/your:target
+# 1. Verify clean build from scratch
+bazel clean && bazel build //path/to/your:target
 
-# 2. Verify tests pass
+# 2. Run all tests
 bazel test //path/to/your:test_target
 
-# 3. Verify the application runs
+# 3. Verify the application works end-to-end
 bazel run //path/to/your:target
 
-# 4. Check for any missing dependencies
+# 4. Check dependency graph for issues
 bazel query "deps(//path/to/your:target)" --output graph
 
-# 5. Verify integration with existing code
+# 5. Verify no regressions in existing code
 bazel test //...
+
+# 6. Test container images if applicable
+bazel build //path/to/your:image
 ```
 
-### Common Issues and Solutions
+### Integration Phase
+- [ ] Update CI/CD configuration to include new targets
+- [ ] Add monitoring and observability hooks
+- [ ] Update relevant documentation
+- [ ] Consider deployment strategies
 
-**Build failures with missing dependencies**:
+## Common Issues and Solutions
+
+### Build Failures
+
+**Missing system dependencies:**
 ```bash
-# Check what Bazel thinks the dependencies are
-bazel query "deps(//your/target:name)" --output build
+# Check what tools are available in Nix environment
+which python java node rustc go
 
-# Verify external dependencies are available
-bazel query @npm//... # for JavaScript
-bazel query @pypi//... # for Python
-bazel query @crates//... # for Rust
+# Verify Bazel rules are properly loaded
+bazel query @rules_python//... --output package
 ```
 
-**Tests failing in CI but not locally**:
-- Ensure all files are included in `srcs` or `data`
-- Check that test dependencies are properly declared
-- Verify no undeclared dependencies on system tools
+**Dependency resolution issues:**
+```bash
+# For Python
+uv lock --upgrade  # Regenerate lockfile
+bazel run @pypi//:requirements.update  # Update Bazel deps
 
-**Cross-language dependencies not working**:
-- Ensure proto targets have `visibility = ["//visibility:public"]`
-- Check that generated code targets are properly named
-- Verify language-specific proto rules are correctly loaded
+# For JavaScript  
+pnpm install       # Update lockfile
+bazel run @npm//:npm_update  # Update Bazel deps
 
-## Next Steps
+# For Rust
+cargo update       # Update Cargo.lock
+bazel run @crates//:repin  # Update Bazel deps
+```
 
-After implementing any of these examples:
+### Runtime Issues
 
-1. **Update Documentation**: Add your implementation to the appropriate agent guide in `docs/agents/`
-2. **Add CI Integration**: Ensure your targets are tested in `.github/workflows/ci.yml`
-3. **Consider Dependencies**: Think about how your code relates to other parts of the monorepo
-4. **Monitor Performance**: Check build times and cache hit rates for your targets
+**Environment configuration:**
+- Ensure all environment variables are declared in BUILD.bazel `env` attributes
+- Use configuration files in `data` dependencies
+- Avoid hardcoded paths or system-specific assumptions
 
-For more detailed implementation guidance, see the technology-specific guides in `docs/agents/`.
+**Cross-language communication:**
+- Verify proto definitions are properly versioned
+- Check that gRPC services use consistent serialization
+- Test API contracts with integration tests
+
+### Performance Problems
+
+**Build performance:**
+```bash
+# Enable build profiling
+bazel build --profile=profile.json //...
+
+# Check for missing incremental build optimizations
+bazel build --experimental_profile_include_target_label //...
+
+# Use remote caching if available
+bazel build --remote_cache=grpc://cache.example.com //...
+```
+
+**Runtime performance:**
+- Profile applications under realistic load
+- Monitor memory usage and GC behavior
+- Use appropriate container resource limits
+
+## Best Practices Summary
+
+### Code Organization
+1. **Single Responsibility**: Each package/module has a clear, focused purpose
+2. **Dependency Management**: Explicit dependencies, no hidden coupling
+3. **Interface Design**: Clean APIs with proper error handling
+4. **Testing**: Comprehensive test coverage at unit and integration levels
+
+### Bazel Integration  
+1. **Granular Targets**: Small, focused build targets for better caching
+2. **Proper Visibility**: Use `//visibility:public` sparingly, prefer package-level visibility
+3. **Data Dependencies**: Include all runtime dependencies in `data` attributes
+4. **Test Organization**: Separate unit and integration tests with appropriate tags
+
+### Development Workflow
+1. **Incremental Development**: Build and test frequently during development
+2. **Local Validation**: Always test locally before pushing changes
+3. **Documentation**: Keep README files and agent guides up-to-date
+4. **Performance Monitoring**: Track build times and cache hit rates
+
+## Getting Help
+
+If you encounter issues:
+
+1. **Check Agent Guides**: Detailed patterns in `docs/agents/[language]/README.md`
+2. **Review Examples**: Working examples in this document
+3. **Query Dependencies**: Use `bazel query` to understand dependency relationships
+4. **Build Analysis**: Use `bazel info` and build profiles to debug performance
+5. **Community Resources**: Bazel documentation, language-specific guides
+
+For complex integration scenarios, consider creating a minimal reproduction case and iterating from there.
