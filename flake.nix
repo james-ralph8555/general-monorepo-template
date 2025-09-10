@@ -2,7 +2,7 @@
   description = "A polyglot monorepo with Bazel and Nix";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -14,11 +14,10 @@
       {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            bazel_6
-            bazelisk
+            bazel
             uv
-            python311
-            nodejs_20
+            python314
+            nodejs_24
             cargo
             rustc
             go
@@ -30,7 +29,7 @@
 
           shellHook = ''
             echo "Entering polyglot monorepo environment with Bazel + Nix"
-            echo "Available tools: bazel, uv, node, cargo, go, protoc, aws"
+            echo "Available tools: bazel, uv, node, cargo, go, protoc, aws, dot"
             echo "Run 'bazel build //...' to build all targets"
             echo "Run 'bazel test //...' to run all tests"
           '';

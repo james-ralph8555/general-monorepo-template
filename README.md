@@ -45,7 +45,7 @@ bazel test //...
 ```
 
 ### Activate flake.nix
-Use the Nix flake dev shell to get all required tools (Bazel, Python, Node, Rust, Go, etc.) on your PATH before running commands:
+Use the Nix flake dev shell to get all required tools (Bazel, Python, Node, Rust, Go, Graphviz, etc.) on your PATH before running commands:
 
 ```bash
 # Interactive shell (from repo root)
@@ -108,7 +108,7 @@ bazel query "deps(//apps/backend:server)"
 # Find what depends on a target (reverse deps)
 bazel query "rdeps(//..., //packages/api:user_proto)"
 
-# Visualize dependency graph
+# Visualize dependency graph (uses Graphviz `dot`, included in the dev shell)
 bazel query "deps(//apps/backend:server)" --output graph | dot -Tpng > deps.png
 ```
 

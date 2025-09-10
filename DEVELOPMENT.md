@@ -24,7 +24,7 @@ This guide provides practical workflows, commands, and troubleshooting for devel
 
 3. **Verify setup**:
    ```bash
-   bazel version      # Should show Bazel 6.x
+   bazel version
    which python       # Should point to Nix store
    which node         # Should point to Nix store
    ```
@@ -236,6 +236,8 @@ bazel test $AFFECTED_TESTS
 ```
 
 ### Dependency Visualization
+
+Note: `dot` is provided by Graphviz and is available in the Nix dev shell.
 
 ```bash
 # Visualize dependencies of a target
