@@ -16,6 +16,12 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.venv/
+
+# uv
+# uv typically creates a project-local virtual environment at .venv/
+# Keep lockfiles (e.g., uv.lock) committed for applications; ignore only ephemeral envs
+
 
 # Node artifacts
 node_modules/

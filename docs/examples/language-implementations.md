@@ -24,6 +24,12 @@ bazel version
 
 ## Python Backend with uv
 
+### uv environment notes
+- Prefer a project-local `.venv/` (git-ignored) created via `uv venv` or `uv sync`.
+- Drive execution with `uv run <cmd>` to avoid manual activation.
+- Commit `uv.lock` for applications; optional for libraries.
+- This repo’s `.gitignore` ignores `.venv/` to keep virtualenvs out of version control.
+
 ### Directory Structure
 ```
 apps/backend/
@@ -66,6 +72,13 @@ dependencies = [
 dev-dependencies = [
     "pytest>=7.0.0",
 ]
+
+# Lockfile guidance
+# For applications, generate and commit a lockfile:
+#   uv lock
+# Local env management (no activation needed):
+#   uv sync
+#   uv run python -m backend
 ```
 
 ## React Frontend
