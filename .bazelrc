@@ -1,0 +1,8 @@
+# Enable Bzlmod for dependency management
+common --enable_bzlmod
+
+# Common build options
+build --show_timestamps
+
+# Use the Nix-provided toolchains by default
+build --host_platform=@rules_nixpkgs_core//platforms:host

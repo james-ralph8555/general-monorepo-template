@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Needed to diff against main
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v22
+        with:
+          nix_path: nixpkgs=channel:nixos-23.11
+
+      - name: Setup Bazel
+        uses: bazelbuild/setup-bazelisk@v3
+
+      - name: Determine Affected Targets
+        id: affected
+        run: |
+          # Use a tool like bazel-diff to get a JSON list of affected targets
+          # For simplicity, we'll just test everything on every run here.
+          # A real implementation would use a more sophisticated script.
+          echo "targets=$(bazel query //...)" >> $GITHUB_OUTPUT
+
+      - name: Run Bazel Test
+        run: |
+          nix develop --command bazel test ${{ steps.affected.outputs.targets }}

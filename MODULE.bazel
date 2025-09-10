@@ -1,0 +1,8 @@
+module(name = "general-monorepo-template")
+
+bazel_dep(name = "rules_nixpkgs_core", version = "0.13.0")
+bazel_dep(name = "rules_nixpkgs", version = "0.13.0")
+
+nix_deps = use_extension("@rules_nixpkgs//nixpkgs:extensions.bzl", "nix_deps")
+nix_deps.from_file(file = "//nix:defs.bzl")
+use_repo(nix_deps, "nixpkgs")
